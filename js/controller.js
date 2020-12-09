@@ -19,6 +19,7 @@ win.minimize();
 var appLocation = "";
 var maximized = false;
 var _ = require('underscore');
+var lodash = require('lodash');
 var confirmUserDetailsCallback;
 var fWidth = 10;
 var fHeight = 10;
@@ -29,11 +30,14 @@ var setAppGeometry;
 var ignoreFocusCheck = 0;
 var thisAppName = "App";
 var doNotTriggerShowWindowEvents = false;
-
+var filesInClipboard = [];
+filesInClipboard.isCut = false;
+var tabToClose; //temporarily hold tab being closed object while waiting for the callback from the instance App
 //var iohook = require("/usr/eXtern/systemX/Shared/CoreWindow/js/iohook");
 
 var wallpaperWidth = screen.width;
 var wallpaperheight = screen.height;
+var lastPo = -1;
 
 if ((screen.width > 1900) && (screen.width > 900)) {
 			var xwidth = 1750-50;
@@ -324,6 +328,16 @@ function enableTabs() {
 	$("#new_tab_instance_button").fadeIn();
 }
 
+/**
+ * Disables tabs. To be called when there is more than 1 instance tab
+ *
+ * @return null.
+ */
+function disableTabs() {
+	$("#tabsBody").addClass("tabsBodyNoTabs");
+	$("#new_tab_instance_button").hide();
+}
+
 var newInstance; //To be used to temporarily store the last added instance tab
 
 /**
@@ -371,9 +385,10 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 	
 	/* FIXME: Work in progress*/
 	App.argv = files;
+	
 	var newAppInstance = {
-		id: "app_tab_"+AppInstances.length,
-		po: AppInstances.length,
+		id: "app_tab_"+(lastPo+1),
+		po: lastPo+1,
 		argv: App.argv,
 		addNewInstanceTab: App.addNewInstanceTab,
 		disableWindowDraggability: App.disableWindowDraggability,
@@ -388,6 +403,24 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 		closeImageEditor: App.closeImageEditor,
 		onResize: function (width, height) {  },
 		unfocused: function () {  },
+		getClipboardFiles: function () { console.log("get new copy here: ",filesInClipboard);
+		var duplicatedClipboard = lodash.cloneDeep(filesInClipboard) /*Using this to prevent manipulation*/
+		duplicatedClipboard.copyDir = filesInClipboard.copyDir;
+		duplicatedClipboard.isCut = filesInClipboard.isCut;
+		
+		/*for (var i = 0; i < filesInClipboard.length; i++) {
+		duplicatedClipboard.push(filesInClipboard[i]);
+		}*/
+		
+		console.log("duplicatedClipboard: ",duplicatedClipboard);
+		return  duplicatedClipboard; },
+		setClipboardFiles: function (clipboardFiles,isCut) { 
+			console.log("setting new copy here: ",clipboardFiles);
+			filesInClipboard = clipboardFiles;
+			filesInClipboard.isCut = isCut;
+			appCommsChannel.postMessage({type: "files-in-clipboard", data: filesInClipboard});
+			
+		},
 		maximize_button: $("#maximize_button")[0],
 		close_button: $("#close_button")[0],
 		minimize_button: $("#minimize_button")[0],
@@ -404,6 +437,7 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 		openNewsSourcesModal: App.openNewsSourcesModal,
 		closeCustomModal: App.closeCustomModal,
 		openCustomModal: App.openCustomModal,
+		getModalButtonsDom: function () { return $("#customDialogBoxButtons")[0] },
 		getMountedDrives: App.getMountedDrives,
 		updateAudio: App.updateAudio,
 		addCustomWallpaper: App.addCustomWallpaper,
@@ -436,6 +470,7 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 		};
 	AppInstances.push(newAppInstance);
 	newInstance = AppInstances[AppInstances.length-1];
+	lastPo++;
 	
 	App.argv = null;
 	
@@ -460,7 +495,7 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 		var tabId = newInstance.po;
 		if (!noLoad) {
 		//$("#tabsBodySelector").append('<li><a href="#app_tab_2">Tab2</a></li>');
-		$("#tabsBodySelector").append('<li id="app_tab_elector_'+tabId+'" title="'+thisAppName+'"><a href="#app_tab_'+tabId+'"><i class="fas fa-object-ungroup pull-left"></i> <span class="pull-left">'+thisAppName+'</span> <i class="fas fa-circle pull-right" onclick="closeTab('+tabId+')"></i></a></li>');
+		$("#tabsBodySelector").append('<li id="app_tab_elector_'+tabId+'" title="'+thisAppName+'"><a href="#app_tab_'+tabId+'"><i class="fas fa-object-ungroup pull-left"></i> <span class="pull-left">'+thisAppName+'</span></a> <i class="fas fa-circle instanceTabCloser" onclick="closeTab(&quot;'+newInstance.id+'&quot;)"></i></li>');
 		
 	
 	    $('.tab a').click(function(e) {
@@ -1537,22 +1572,77 @@ App.requestOnClose = function(callback) {
 	closeCallback = callback;
 }
 
+function closeTabNow() {
+			var switchTab = false;
+			if ($("#app_tab_elector_"+tabToClose.po).hasClass("active")) {
+				switchTab = true;
+			}
+			$("#app_tab_elector_"+tabToClose.po).remove();
+			$("#app_tab_"+tabToClose.po).remove();
+			for (var i = 0; i < AppInstances.length; i++) {
+				if (tabToClose.id == AppInstances[i].id) {
+					console.log("inside if: ");
+				 	if (switchTab) {
+				 		if (i > 0) {
+				 			$("#app_tab_elector_"+AppInstances[i-1].po+" > a").click();
+				 		} else {
+				 			$("#app_tab_elector_"+AppInstances[i+1].po+" > a").click();
+				 		}
+				 	}
+				 	
+					AppInstances.splice(i, 1);
+				}
+			}
+			
+			tabToClose = null; //not needed anymore
+			if (AppInstances.length == 1) {
+				hideInstanceTabs();
+				disableTabs();
+			}
+			console.log("AppInstances removed: ",AppInstances);
+}
+
 var closeCalls = 0;
 App.close = function () {
-	console.log("requested to close");
-	readyToClose = true;
-	if (requestOnCloseCallbacksNo != 0) {
-		closeCalls++;
-	if (requestOnCloseCallbacksNo == closeCalls)
-		console.log("you can now close"); 
+
+	if (tabToClose != null) {
+		if (tabToClose.closeInProgress) {
+			closeTabNow();
+		} else {
+			console.log("close tB REQUEST");
+			tabToClose.closeInProgress = true;
+			if (tabToClose.closeCallback != null) {
+				requestOnCloseCallbacksNo--;
+				tabToClose.closeCallback();
+			} else {
+				closeTabNow();
+			}
+			
+		}
+	} else {
+		console.log("requested to close");
+		readyToClose = true;
+		if (requestOnCloseCallbacksNo != 0) {
+			closeCalls++;
+		if (requestOnCloseCallbacksNo == closeCalls)
+			console.log("you can now close"); 
 		win.close();
+	}
 	}
 	
 	
 }
 
 function closeTab(tabId) {
-
+console.log("close tab called: ",tabId);
+	for (var i = 0; i < AppInstances.length; i++) {
+		console.log("AppInstances[i].id: ",AppInstances[i].id);
+		if (AppInstances[i].id == tabId) {
+			console.log("tab to close found");
+			tabToClose = AppInstances[i];
+			AppInstances[i].close();
+		}
+	}
 }
 
 App.checkInstanceFocus = function() {
@@ -1615,9 +1705,12 @@ win.on('close', function() {
 		App = null;
 		this.close(true);
 	} else if (requestOnCloseCallbacksNo != 0){
+	console.log("trying to close");
 		for (var i = 0; i < AppInstances.length; i++) {
-			if (AppInstances[i].closeCallback != null)
+			if (AppInstances[i].closeCallback != null) {
+			console.log("trying to callback: ",AppInstances[i].closeCallback);
 				AppInstances[i].closeCallback();
+			}
 		}
 		
 	} else {
@@ -1728,6 +1821,7 @@ setTimeout(function(){
 				allActiveNews = ev.data.allActiveNews;
 				enabledSources = ev.data.enabledSources;
 				improvePerfomanceMode = ev.data.improvePerfomanceMode;
+				filesInClipboard = ev.data.filesInClipboard;
 				if (improvePerfomanceMode)
 					$("#outerBody").addClass("improvePerfomanceModeBody");
 				else
