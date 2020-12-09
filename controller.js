@@ -11,6 +11,7 @@ var initLoaded = false;
 var appLoaded = false;
 var Appready = false;
 var enableDisableBlurOnMaximize = false;
+var disableBlurOnLostFocus = false;
 var delayShowingApp = false;
 var useRealTimeBlur = false;
 var allActiveNews;
@@ -25,6 +26,14 @@ var enabledSources = [];
 //var robot = require("robotjs");
 var imageEditor;
 var setAppGeometry;
+var ignoreFocusCheck = 0;
+var thisAppName = "App";
+var doNotTriggerShowWindowEvents = false;
+
+//var iohook = require("/usr/eXtern/systemX/Shared/CoreWindow/js/iohook");
+
+var wallpaperWidth = screen.width;
+var wallpaperheight = screen.height;
 
 if ((screen.width > 1900) && (screen.width > 900)) {
 			var xwidth = 1750-50;
@@ -42,6 +51,7 @@ var finalAppGeometry = {
 	}
 var waitForAppToRespond = false;
 
+/* Supported file extensions */
 var map = {
   'compressed zip': ['zip'],
     'compressed rar': ['rar'],
@@ -80,7 +90,7 @@ var map = {
     'audio': ['mp3', 'wma', 'wav','aiff','m4a','ape','wv','act','aac','au','dss','flac','iklax','ivs','m4p','mmf','mpc','ogg','oga','opus','raw','sln','tta','vox'],
 };
 
-
+/* End of file extensions */
 
 
 /* Start of Video Playback API */
@@ -238,19 +248,11 @@ var duration = 0;
     };
 
     Xplay.prototype.keypress = function (key) {
-      //var type = 'command';
-      //var data = ['keypress', key];
-      //const sendv = {type, data};
-      //embed.postMessage(sendv);
       this.sendCommand("keypress", key);
       return this;
     };
 
     Xplay.prototype.setPosition = function (seconds) {
-      //var type = 'command';
-      //var data = ['keypress', key];
-      //const sendv = {type, data};
-      //embed.postMessage(sendv);
       if (duration > 3599)
           var durationCnverted = new Date(parseInt(seconds) * 1000).toISOString().substr(11, 8);
         else
@@ -268,7 +270,257 @@ var duration = 0;
 
 /* End of Video Playback API */
 
+var AppInstances = [];
+
+function getInstance() {
+	
+}
+
+/**
+ * Hides instance tabs with an animated fade
+ *
+ * @return null.
+ */
+function hideInstanceTabs() {
+	if ($("#new_tab_instance_button").hasClass("hidden")) {
+		console.log("hide now");
+		
+		$("#tabsBodySelector").fadeOut( "fast", function() {
+			$("#tabsBody").removeClass("tab-overview-body");
+    			$("#new_tab_instance_button").removeClass("hidden");
+  		});
+	}
+}
+
+/**
+ * Toggles instance tabs (show or hide) with a smooth animation.
+ *
+ * @return null.
+ */
+function toggleInstanceTabs() {
+	if ($("#new_tab_instance_button").hasClass("hidden")) {
+		console.log("hide now");
+		$("#tabsBodySelector").fadeOut( "fast", function() {
+			$("#tabsBody").removeClass("tab-overview-body");
+    			$("#new_tab_instance_button").removeClass("hidden");
+  		});
+	} else {
+		console.log("show now");
+		$("#new_tab_instance_button").addClass("hidden");
+		$("#tabsBody").addClass("tab-overview-body");
+		setTimeout(function() {
+		$("#tabsBodySelector").fadeIn();
+		}, 300);
+	}
+}
+
+/**
+ * Enables tabs. To be called when there is more than 1 instance tab
+ *
+ * @return null.
+ */
+function enableTabs() {
+	$("#tabsBody").removeClass("tabsBodyNoTabs");
+	$("#new_tab_instance_button").fadeIn();
+}
+
+var newInstance; //To be used to temporarily store the last added instance tab
+
+/**
+ * Returns the latest added instance.
+ * Will automatically set it to null to prevent being called again.
+ * It's used for instances wanting to get a handle of their instance on load.
+ *
+ * @return {instanceTab}.
+ */
+function getInstance() {
+	var returnInstance = newInstance;
+	newInstance = null;
+	
+	return returnInstance;
+}
+
+/**
+ * Returns Apps relative to the file types they support.
+ *
+ * @return {fileTypesApps}.
+ */
+function getFileTypesApps() {
+	return App.fileTypesApps;
+}
+
+var requestOnCloseCallbacksNo = 0; //stores number of tabs that need to be asked before the whole window is closed
+
+/**
+ * Creates a new instance tab.
+ *
+ * @param {array} Files for argv for the new instance tab.
+ * @param {boolean} Do we automatically switch to this new instance tab?
+ * @param {boolean} Do we load App into the instance tab? Set to false for the first instance tab.
+ * @return {null].
+ */
+App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
+	if (files != null)
+		if (!Array.isArray(files)) {
+			var filesString = files;
+			files = [];
+			if (filesString !== undefined)
+				files.push(filesString);
+		
+		}
+	
+	/* FIXME: Work in progress*/
+	App.argv = files;
+	var newAppInstance = {
+		id: "app_tab_"+AppInstances.length,
+		po: AppInstances.length,
+		argv: App.argv,
+		addNewInstanceTab: App.addNewInstanceTab,
+		disableWindowDraggability: App.disableWindowDraggability,
+		enableWindowDraggability: App.enableWindowDraggability,
+		getFileTypesApps: getFileTypesApps,
+		getMimeType: App.getMimeType,
+		getDefaultLegacyApp: App.getDefaultLegacyApp,
+		getLegacyFileAssociations: App.getLegacyFileAssociations,
+		imageEditor: App.imageEditor,
+		disableAdaptiveBlur: App.disableAdaptiveBlur,
+		enableAdaptiveBlur: App.enableAdaptiveBlur,
+		closeImageEditor: App.closeImageEditor,
+		onResize: function (width, height) {  },
+		unfocused: function () {  },
+		maximize_button: $("#maximize_button")[0],
+		close_button: $("#close_button")[0],
+		minimize_button: $("#minimize_button")[0],
+		loading_animation: $("#loadingAnimation")[0],
+		onMaximize: function () {  },
+		isMaximized: false,
+		restored: function () { },
+		Xplay: Xplay,
+		resolveFileType: App.resolveFileType,
+		toggleNetworkOptions: App.toggleNetworkOptions,
+		sysOptions: App.sysOptions,
+		newsSourceModalClosed: function () { },
+		closeNewsSourcesModal: App.closeNewsSourcesModal,
+		openNewsSourcesModal: App.openNewsSourcesModal,
+		closeCustomModal: App.closeCustomModal,
+		openCustomModal: App.openCustomModal,
+		getMountedDrives: App.getMountedDrives,
+		updateAudio: App.updateAudio,
+		addCustomWallpaper: App.addCustomWallpaper,
+		packageApp: App.packageApp,
+		openApp: App.openApp,
+		addNewStack: App.addNewStack,
+		newNotification: App.newNotification,
+		RunAppDev: App.RunAppDev,
+		devToolsShow: App.devToolsShow,
+		getAllNews: App.getAllNews,
+		ready: App.ready,
+		updateTitle: function (title) {
+		console.log("titlem: ",this);
+		$("#app_tab_elector_"+this.po+" > a > span").text(title);
+		$("#app_tab_elector_"+this.po).attr("title",title);
+		},
+		updateTrack: App.updateAudio, //Backwards compatibility, delete later
+		newsSourceUpdated: App.newsSourceUpdated,
+		closeCallback: null,
+		requestOnClose: function (callback) {
+			readyToClose = false;
+			requestOnCloseCallbacksNo++;
+			console.log("requestOnCloseCallbacksNo: ",requestOnCloseCallbacksNo);
+			this.closeCallback = callback;
+		},
+		close: App.close,
+		onOpenFiles: function () { },
+		explorebar: explorebar,
+		showWindowEvent: null
+		};
+	AppInstances.push(newAppInstance);
+	newInstance = AppInstances[AppInstances.length-1];
+	
+	App.argv = null;
+	
+	if (appLocation.indexOf("extern.files.app") != -1)
+		AppInstances[AppInstances.length-1].isReady = function () {
+			if (AppInstances.length > 1)
+				if (files != null) {
+					//AppInstances[AppInstances.length-1].onOpenFiles(files);
+				} else
+					AppInstances[AppInstances.length-1].showWindowEvent();
+		}
+	
+	console.log("set new instance: ",newInstance);
+	//enableTabs();
+	console.log("AppInstances.length: ",AppInstances.length);
+	
+	var hiddenOpacityClass = "";
+	
+	if (setAppGeometry != null) {
+		hiddenOpacityClass = " hiddenOpacity";
+	}
+		var tabId = newInstance.po;
+		if (!noLoad) {
+		//$("#tabsBodySelector").append('<li><a href="#app_tab_2">Tab2</a></li>');
+		$("#tabsBodySelector").append('<li id="app_tab_elector_'+tabId+'" title="'+thisAppName+'"><a href="#app_tab_'+tabId+'"><i class="fas fa-object-ungroup pull-left"></i> <span class="pull-left">'+thisAppName+'</span> <i class="fas fa-circle pull-right" onclick="closeTab('+tabId+')"></i></a></li>');
+		
+	
+	    $('.tab a').click(function(e) {
+		e.preventDefault();
+		$(this).tab('show');
+	    });
+	    
+	
+	$("#tabsBody").append('<div class="tab-pane overflow" style="height: 100%;" id="app_tab_'+tabId+'"> <iframe class="appContainer" src="../../'+appLocation+'" frameborder="0" partition="persist:trusted" allownw class="appInstance '+hiddenOpacityClass+'"> </iframe></div>');
+	$("#app_tab_"+tabId+" > iframe").load( function() {
+					
+					console.log("executed",this);
+					$(this).contents().find("head")
+      .prepend($("<style type='text/css'>  .btn { border-color: "+winButtonProperties.borderColor+" !important;}  </style> <link href='../../../Shared/CoreCSS/scrollbar.css' rel='stylesheet'> <script> window.instance = parent.newInstance;  console.log('window.instance',window.instance); document.addEventListener('click', function() { console.log('focused iframe'); });</script>"));
+
+	$(this.contentWindow.document.body).click(function() {
+		hideInstanceTabs();
+	});
+	
+	console.log("autoswitch: ",autoSwitch);
+	
+	if (autoSwitch)
+	    	$("#app_tab_elector_"+tabId+" > a").click();
+	//frameBody.click(function(){ /* ... */ });
+
+	});
+	
+	}
+	
+	if (AppInstances.length > 1) {
+		enableTabs();
+		//console.log("appLocation: ",appLocation);
+		//console.log("appLocation2: ",AppInstances[AppInstances.length-1]);
+		/*if (appLocation.indexOf("extern.files.app") != -1)
+			setTimeout(function(){ AppInstances[AppInstances.length-1].showWindowEvent();}, 1000);*/
+	}
+	
+
+}
+
+App.disableWindowDraggability = function () {
+	$("#windowTitleBar").removeClass("drag_enabled");
+};
+
+App.enableWindowDraggability = function () {
+	if (!$("#windowTitleBar").hasClass("drag_enabled")) {
+		$("#windowTitleBar").addClass("drag_enabled");
+	}
+	
+};
+
 App.setTimeout = setTimeout;
+
+/**
+ * Returns mime type of a given file
+ *
+ * @param {string} File to check.
+ * @param {function} Callback function to return the result to.
+ * @return {null}.
+ */
 App.getMimeType = function (file,callback) {
 //console.log("monitoring");
 var childProcess = require('child_process');
@@ -297,6 +549,13 @@ child.stdout.on('end', function () {
 });
 }
 
+/**
+ * Returns legacy Apps that support the given mime type (file type).
+ *
+ * @param {string} Mime type to check.
+ * @param {function} Callback function to return the result to.
+ * @return {null}.
+ */
 function getDefaultLegacyApp(mimeType, callback) {
 		var childProcess = require('child_process');
 		var spawn = childProcess.spawn;
@@ -308,31 +567,16 @@ function getDefaultLegacyApp(mimeType, callback) {
 					callback(res);
 				}
 			});
-		/*var child = spawn('xdg-mime', ['query','default',mimeType]);
 		
-		child.stdout._handle.setBlocking(true);	
-		////console.log("spawned: " + child.pid);
-		
-		child.stdout.on('data', function(data) {
-			console.log("Child data: " + data);
-			if (callback != null) {
-				callback(data.toString());
-			}
-		});
-		
-		child.on('error', function () {
-			console.log("Failed to start child.");
-		});
-		
-		child.on('close', function (code) {
-			console.log('Child process exited with code ' + code);
-		});
-		
-		child.stdout.on('end', function () {
-			console.log('Finished collecting data chunks.');
-		});*/
 }
 
+/**
+ * Returns legacy Apps that support the given mime type (file type).
+ *
+ * @param {string} Mime type to check.
+ * @param {function} Callback function to return the result to.
+ * @return {null}.
+ */
 App.getDefaultLegacyApp = function (file,callback) {
 
 	App.getMimeType(file, function (mimeType) {
@@ -415,16 +659,28 @@ var imageEditorCallback;
          }
 	$(".imageEditorElement").removeClass("hiddenOpacity");
 
-	}, 100);
+	}, 1000);
 }
 
+var forceNoBlur = false;
+var forceBlur = false;
 //For Apps like video players to save resources
-App.disableAdaptiveBlur = function() {
-	executeNativeCommand("xprop -f _KDE_NET_WM_BLUR_BEHIND_REGION 32c -remove _KDE_NET_WM_BLUR_BEHIND_REGION -id "+internalId);
+App.disableAdaptiveBlur = function(forceState,temporaryForce) {
+	if (forceState && !temporaryForce)
+		forceNoBlur = true;
+		if (!forceBlur)
+			executeNativeCommand("xprop -f _KDE_NET_WM_BLUR_BEHIND_REGION 32c -remove _KDE_NET_WM_BLUR_BEHIND_REGION -id "+internalId);
 }
 
-App.enableAdaptiveBlur = function() {
-	executeNativeCommand('xprop -f _KDE_NET_WM_BLUR_BEHIND_REGION 32c -set _KDE_NET_WM_BLUR_BEHIND_REGION 0 -id '+internalId);
+App.enableAdaptiveBlur = function(forceState,temporaryForce) {
+	if (!forceNoBlur || forceState) {
+		forceNoBlur = false;
+
+		if (forceState && !temporaryForce)
+			forceBlur = true;
+		executeNativeCommand('xprop -f _KDE_NET_WM_BLUR_BEHIND_REGION 32c -set _KDE_NET_WM_BLUR_BEHIND_REGION 0 -id '+internalId);
+	}
+		
 }
 
 App.closeImageEditor = function (saveChanges) {
@@ -460,14 +716,156 @@ App.unfocused = function () {
 
 }
 
+var currentlyProcessingIDPos = 0;
+var winIdsToProcess = [];
+var keepChecking = false;
+
+function checkIfAnotherWindowExistBehindWIndow() {
+	if ((currentlyProcessingIDPos < winIdsToProcess.length) && keepChecking) {
+		executeNativeCommand('/usr/eXtern/systemX/extern.explorebar/js/windowDimensionsById.sh '+winIdsToProcess[currentlyProcessingIDPos], function(data, err) {
+			if (!err) {
+				//console.log("data pos: ", data);
+				var dataSplit = data.split(" ");
+				//console.log("dataSplit: ",dataSplit);
+				var x = dataSplit[0];
+				var y = dataSplit[1];
+				var width = dataSplit[2];
+				var height = dataSplit[3];
+			}
+			if (((x+width) > win.x) && ((win.x+win.width) > x) && ((y+height) > win.y) && ((win.y+win.height) > y)) {
+				App.enableAdaptiveBlur();
+				$("background").fadeOut( 400, function() {
+					App.enableAdaptiveBlur();
+				});
+			} else {
+				currentlyProcessingIDPos++;
+				checkIfAnotherWindowExistBehindWIndow();
+			}
+			
+		});
+	} else {
+		console.log("we are using this")
+		$("background").fadeIn( 400, function() {
+			App.disableAdaptiveBlur(true,true);
+		});
+
+	}
+	
+}
+
+var itatiFirstTriggered = 0;
+
+function focusBlurCheck() {
+	if (enableDisableBlurOnMaximize || disableBlurOnLostFocus) {
+			//App.enableAdaptiveBlur();
+			//$("background").addClass("hidden");
+			//$("background").addClass("hiddenOpacity");
+			keepChecking = false;
+		executeNativeCommand('xdotool search --all --onlyvisible --desktop $(xprop -notype -root _NET_CURRENT_DESKTOP | cut -c 24-) "" 2>/dev/null', function(data, err) {
+			if (!err) {
+				var currentWorkspaceWindowIds = data.split("\n");
+				winIdsToProcess = [];
+				currentlyProcessingIDPos = 0;
+				for (var i = 0; i < currentWorkspaceWindowIds.length; i++) {
+					if (currentWorkspaceWindowIds[i] != "") {
+						var hexString = parseInt(currentWorkspaceWindowIds[i]).toString(16);
+						hexString = "0x0"+hexString;
+						console.log("testing...")
+						if (internalId != hexString)
+							winIdsToProcess.push(hexString);
+					}
+					
+				}
+				console.log("all Apps data",currentWorkspaceWindowIds);
+				
+				console.log("test hex winIdsToProcess: ",winIdsToProcess);
+				keepChecking = true;
+				checkIfAnotherWindowExistBehindWIndow();
+				
+			}
+		});
+		}
+}
+
+
+var focusTriggeredCounter = 0;
 win.on('focus', function() {
 	if (!Appready) {
 		win.blur();
+	} else {
+		if (focusTriggeredCounter > 0) {
+			console.log("coming here A");
+			focusBlurCheck();
+		} else {
+			focusTriggeredCounter++;
+		}
+		
+		
+		if (itatiFirstTriggered < 4) {
+			itatiFirstTriggered++;
+			console.log("adding focus");
+		} else {
+		if (appLocation.indexOf("extern.itai.app") != -1) {
+			console.log("itai triggered C");
+			executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -remove _NET_WM_WINDOW_OPACITY");
+		}
+		}
+		console.log("checking focus");
+		
+
 	}
 
-})
+});
+
+$(document).ready(function() {
+console.log("ready!!! hoverDetection");
+$('#hoverDetection').on("mouseenter", function() {
+	console.log("hover...");
+	/*$("background").fadeOut( 400, function() {
+       App.enableAdaptiveBlur(true,true);
+	});*/
+    }).on("mouseleave", function() {
+		console.log("leave...");
+		/*$("background").fadeIn( 400, function() {
+			App.disableAdaptiveBlur(true,true);
+		});*/
+	   //focusBlurCheck();
+    });
+    
+    });
+
+	var oldWinX = 0; //Used to prevent loops as apparently on("move") randomly keeps triggering until window loses focus
+	var oldWinY = 0;
+
+    win.on('move', function() {
+		//win.blur();
+		//win.focus();
+    $("background")[0].style['background-position'] = -win.x+"px "+(-win.y)+"px";
+        
+	console.log("We're moving");
+
+	if (Appready && oldWinX != win.x && oldWinY != win.y) {
+		oldWinX = win.x;
+		oldWinY = win.y;
+		console.log("coming here B");
+		focusBlurCheck();
+	}
+			//focusBlurCheck();
+	
+  }); 
 
 win.on('blur', function() {
+
+if (disableBlurOnLostFocus) {
+	//$("background").removeClass("hidden");
+	//$("background").removeClass("hiddenOpacity");
+	//App.disableAdaptiveBlur();
+	console.log("disabling blur here")
+	keepChecking = false;
+	$("background").fadeIn( 400, function() {
+    		App.disableAdaptiveBlur();
+    	});
+}
 
 //Appready = true;
 
@@ -592,8 +990,13 @@ win.on('maximize', function() {
 	if (enableDisableBlurOnMaximize && Appready) {
 	maximized = true;
 	console.log("maximize called");
-	$("background").removeClass("hidden");
-	App.disableAdaptiveBlur();
+	//$("background").removeClass("hidden");
+	//$("background").removeClass("hiddenOpacity");
+	console.log("disabling blur here2")
+	$("background").fadeIn( 400, function() {
+    		App.disableAdaptiveBlur();
+  	});
+	
 	}
 });
 
@@ -601,6 +1004,15 @@ $("#minimize_button")[0].onclick = function() {
 	win.minimize();
 };
 win.on('minimize', function() {
+
+	if (disableBlurOnLostFocus) {
+		//$("background").removeClass("hidden");
+		//$("background").removeClass("hiddenOpacity");
+		console.log("disabling blur here3")
+		$("background").fadeIn( 400, function() {
+			App.disableAdaptiveBlur();
+    		});
+	}
 
 	console.log("minimize triggered");
 
@@ -619,7 +1031,7 @@ App.restored = function () {
 
 function loadWindowVisuals() {
 
-	$("#appContainer").removeClass("hiddenOpacity");
+	$(".appContainer").removeClass("hiddenOpacity");
 	$("#body_settings").removeClass("zeroOpacity");
 	$("#outerBody").addClass("noMargins");
 	console.log("restored called");
@@ -651,9 +1063,19 @@ win.on('restore', function() {
 
 	App.restored();
 maximized = false;
-	if (enableDisableBlurOnMaximize)
+	/*if (enableDisableBlurOnMaximize || disableBlurOnLostFocus) {
 		App.enableAdaptiveBlur();
-	$("background").addClass("hidden");
+		$("background").fadeOut( 400, function() {
+    		App.enableAdaptiveBlur();
+    		});
+	} else {
+		$("background").fadeOut( 400, function() {
+    		//App.enableAdaptiveBlur();
+    		});
+    		//$("background").addClass("hidden");
+		//$("background").addClass("hiddenOpacity");
+	}*/
+	
 var currentdate = new Date();
 console.log("restored here  at: "+currentdate.getMinutes()+":"+currentdate.getSeconds()+":"+currentdate.getMilliseconds());
 	console.log("restore: ",internalId);
@@ -668,6 +1090,7 @@ console.log("restored here  at: "+currentdate.getMinutes()+":"+currentdate.getSe
 
 	if (appLocation.indexOf("extern.itai.app") != -1) {
 	console.log("itai triggered B");
+		//executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -remove _NET_WM_WINDOW_OPACITY");
 		executeNativeCommand('xprop -f _NET_WM_WINDOW_TYPE 32a -set _NET_WM_WINDOW_TYPE _NET_WM_WINDOW_TYPE_NORMAL -id '+internalId);
 	}
 
@@ -759,6 +1182,11 @@ App.openCustomModal = function (body,inputElements) {
 		currentInputElements = inputElements;
 		if (inputElements.buttons != null && Array.isArray(inputElements.buttons)) {
 			$("#customDialogBoxButtons").empty();
+			$("#customDialogBoxButtons").removeClass("text-center");
+			console.log("inputElements.buttons: ",inputElements.buttons);
+			if (inputElements.buttons.centerise) {
+				$("#customDialogBoxButtons").addClass("text-center");
+			}
 			for (var i = 0; i < inputElements.buttons.length; i++) {
 				var buttonClass = "";
 				if (inputElements.buttons[i].pullLeft)
@@ -833,13 +1261,14 @@ console.log("using scale");
 		//win.restore();
 setTimeout(function(){ 
 executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -remove _NET_WM_WINDOW_OPACITY");
-//$("#appContainer").removeClass("hiddenOpacity");
+//$(".appContainer").removeClass("hiddenOpacity");
  }, delay);
  setTimeout(function(){ 
 
 	win.maximize();
 	$("#appPreview").addClass("hiddenOpacity");
 	appCommsChannel.postMessage({type: "app-opened"});
+	setTimeout(function(){  win.setAlwaysOnTop(false); }, 1000);
 
 //openAppAnimation();
  }, delay);
@@ -864,7 +1293,7 @@ executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -re
 	console.log("oldY: ",oldY);
 
 	
-	App.enableAdaptiveBlur();
+	//App.enableAdaptiveBlur();
 	win.resizeTo(oldWidth,oldHeight);
 	win.moveTo(oldX, oldY);
 
@@ -889,7 +1318,7 @@ win.minimize();
 	console.log("oldY: ",oldY);
 
 	
-	App.enableAdaptiveBlur();
+	//App.enableAdaptiveBlur();
 	win.resizeTo(oldWidth,oldHeight);
 	win.moveTo(oldX, oldY);
 win.minimize();
@@ -919,6 +1348,7 @@ executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -re
 	win.restore(); 
 
 	appCommsChannel.postMessage({type: "app-opened"});
+	setTimeout(function(){  win.setAlwaysOnTop(false); }, 1000);
 	enableDisableBlurOnMaximize = true;
 
 
@@ -1107,11 +1537,30 @@ App.requestOnClose = function(callback) {
 	closeCallback = callback;
 }
 
+var closeCalls = 0;
 App.close = function () {
 	console.log("requested to close");
 	readyToClose = true;
-	win.close();
+	if (requestOnCloseCallbacksNo != 0) {
+		closeCalls++;
+	if (requestOnCloseCallbacksNo == closeCalls)
+		console.log("you can now close"); 
+		win.close();
+	}
 	
+	
+}
+
+function closeTab(tabId) {
+
+}
+
+App.checkInstanceFocus = function() {
+  if(document.activeElement == "IFRAME") {
+    console.log('iframe has focus: ',document.activeElement.tagName);
+  } else {
+    console.log('iframe not focused');
+  }
 }
 
 App.onOpenFiles = function () {};
@@ -1152,6 +1601,7 @@ App.onOpenFiles = function () {};
 
 //win.initWindow
 
+console.log("win.cWindow.id: ",win.cWindow.id);
 
 const appCommsChannel = new BroadcastChannel("eXternOSApp"+win.cWindow.id); //Comms channel between process manager and this App
 
@@ -1164,8 +1614,12 @@ win.on('close', function() {
 		$("#main").empty();
 		App = null;
 		this.close(true);
-	} else if (closeCallback != null){
-		closeCallback();
+	} else if (requestOnCloseCallbacksNo != 0){
+		for (var i = 0; i < AppInstances.length; i++) {
+			if (AppInstances[i].closeCallback != null)
+				AppInstances[i].closeCallback();
+		}
+		
 	} else {
 		appCommsChannel.postMessage({type: "closed"});
 		$("#main").empty();
@@ -1187,7 +1641,7 @@ appCommsChannelTemp.onmessage = function (ev) {
 
 }
 };*/
-		$("#appContainer").removeClass("hiddenOpacity");
+		$(".appContainer").removeClass("hiddenOpacity");
 		//$("#outerBody").addClass("bg_settings");
 	appCommsChannel.postMessage({type: "requesting-init-settings"});
 appCommsChannel.onmessage = function (ev) {
@@ -1222,15 +1676,21 @@ appCommsChannel.onmessage = function (ev) {
 			if (useRealTimeBlur)
 				hideBackgroundClass = "hidden";
 		//}
+		
+		var globalDefaultBgSize = wallpaperWidth+'px '+wallpaperheight+'px';
+		
+		globalDefaultBgPosition = '0 0';
+		
+		//height: '+wallpaperheight+'px; width: '+wallpaperWidth+'px;
       if ($( window.document.body.children[0])[0].nodeName !="BACKGROUND")
 		if (globalDefaultBgPosition != "") {
-		          $(window.document.body).prepend('<background class="noMargins hidden" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat; background-position: '+globalDefaultBgPosition+';" class="'+hideBackgroundClass+'"></background>');
+		          $(window.document.body).prepend('<background class="noMargins" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat; background-position: '+globalDefaultBgPosition+'; background-size: '+globalDefaultBgSize+';" class="'+hideBackgroundClass+'"></background>');
 	document.body.children[0].style.backgroundImage = ev.data.data;
 //ev.data.data
 		//$(new_win.outerBodyBackground[0]).css("background-position",new_win.oldbackgroundPosition);
 		console.log("set with.. ",globalDefaultBgPosition);
 	} else {
-		$(window.document.body).prepend('<background class="noMargins hidden" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat;" class="'+hideBackgroundClass+'"></background>');
+		$(window.document.body).prepend('<background class="noMargins" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat;" class="'+hideBackgroundClass+'"></background>');
 
 	document.body.children[0].style.backgroundImage = ev.data.data;
 	}
@@ -1254,6 +1714,12 @@ setTimeout(function(){
 				App.fileTypesApps = ev.data.fileTypesApps;
 				App.apps = ev.data.allInstalledApps;
 				App.legacyApps = ev.data.allLegacyApps;
+				/*for (var i = 0; i < AppInstances.length; i++) {
+				AppInstances[i].osVersion = ev.data.osVersion;
+				AppInstances[i].fileTypesApps = ev.data.fileTypesApps;
+				AppInstances[i].apps = ev.data.allInstalledApps;
+				AppInstances[i].legacyApps = ev.data.allLegacyApps;
+				}*/
 				if (allActiveNews != ev.data.allActiveNews && allActiveNews != null) {
 					console.log("news updated: ",ev.data.allActiveNews);
 					console.log("ev.data.enabledSources: ",ev.data.enabledSources);
@@ -1294,13 +1760,30 @@ setTimeout(function(){
 
 
 			if (ev.data.type == "open-files") {
-				console.log("minimizing called");
-				App.onOpenFiles(ev.data.files);
+				console.log("open-files: ",ev.data.files);
+				doNotTriggerShowWindowEvents = true;
+				AppInstances[AppInstances.length-1].onOpenFiles(ev.data.files);
 			}
 
 			if (ev.data.type == "minimize-window") {
 				console.log("minimizing called");
 				win.minimize();
+			}
+			
+			if (ev.data.type == "set-volume") {
+				AppInstances[AppInstances.length-1].setVolume(ev.data.level);
+			}
+			
+			if (ev.data.type == "increase-volume") {
+				AppInstances[AppInstances.length-1].increaseVolume();
+			}
+			
+			if (ev.data.type == "decrease-volume") {
+				AppInstances[AppInstances.length-1].decreaseVolume();
+			}
+			
+			if (ev.data.type == "set-brightness") {
+				AppInstances[AppInstances.length-1].setBrightnes(ev.data.level);
 			}
 
 			if (ev.data.type == "show-window") {
@@ -1308,6 +1791,8 @@ setTimeout(function(){
 				if (appLocation.indexOf("extern.itai.app") != -1) {
 					win.hide();
 				}
+
+				//setTimeout(function() { disableBlurOnLostFocus = true;}, 5000);
 //loadWindowVisuals(); 
 				//win.minimize();
 				//executeNativeCommand("wmctrl -i -R "+internalId);
@@ -1318,13 +1803,17 @@ setTimeout(function(){
 
 				//win.show()
 
-		$("#appContainer").removeClass("hiddenOpacity");
+		$(".appContainer").removeClass("hiddenOpacity");
 		
  //loadWindowVisuals(); 
 
 if (appLocation.indexOf("extern.files.app") != -1) {
+//win.showDevTools();
 console.log("restoring files app: ",fWidth);
 console.log("restoring files app height: ",fHeight);
+console.log("App.argv: ",App.argv);
+if (!doNotTriggerShowWindowEvents)
+	AppInstances[AppInstances.length-1].showWindowEvent();
 //win.width = 10;
 //win.height = 10;
 //win.resizeTo(10,10);
@@ -1345,14 +1834,15 @@ console.log("restoring files app height: ",fHeight);
 
 //executeNativeCommand('wmctrl -i -R '+internalId, function () { 
 
-Appready = true;
+
 win.setVisibleOnAllWorkspaces(false);
 appCommsChannel.postMessage({type: "app-opened"});
+setTimeout(function(){  win.setAlwaysOnTop(false); }, 1000);
 enableDisableBlurOnMaximize = true;
 
 
 console.log("don't minimize");
-App.enableAdaptiveBlur();
+//App.enableAdaptiveBlur();
 
 //win.minimize(); 
 
@@ -1366,8 +1856,9 @@ executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -re
 
 
 
-
+Appready = true;
 win.restore(); 
+//win.showDevTools();
 
 });
 //}, 300);
@@ -1485,6 +1976,9 @@ setTimeout(function() { win.restore(); }, 500);
 			console.log("cjhecking....");
 			if (ev.data.type == "load-App") {
 appLocation = ev.data.appLocation;
+thisAppName = ev.data.appName;
+$("#app_tab_elector_0 > a > span").text(thisAppName);
+$("#app_tab_elector_0").attr("title",thisAppName);
 setAppGeometry = ev.data.appGeometry;
 App.argv = ev.data.argv;
 if (ev.data.waitForAppToRespond != null)
@@ -1564,16 +2058,31 @@ var hiddenOpacityClass = "";
 if (setAppGeometry != null) {
 	hiddenOpacityClass = " hiddenOpacity";
 }
-		setTimeout(function() { 
 
-				$("#main").append('<iframe id="appContainer" src="../../'+ev.data.appLocation+'" frameborder="0" partition="persist:trusted" style="    position: absolute; width: 100%; height: 100%;" allownw class="appInstance '+hiddenOpacityClass+'"> </iframe>');
+App.addNewInstanceTab(App.argv,true,true);
+		setTimeout(function() { 
+			var tabId = 0;
+				$("#app_tab_"+tabId).append('<iframe onclick="App.checkInstanceFocus()" class="appContainer" src="../../'+ev.data.appLocation+'" frameborder="0" partition="persist:trusted" allownw class="appInstance '+hiddenOpacityClass+'"> </iframe>');
 				console.log("elementx: ",document.getElementsByTagName("IFRAME")[0]);
-				$(document.getElementsByTagName("IFRAME")[0]).load( function() {
+				$("#app_tab_"+tabId+" > iframe").load( function() {
 					
-					console.log("executed",$(window.frames.document).contents().find("head"));
-					$(document.getElementsByTagName("IFRAME")[0]).contents().find("head")
-      .prepend($("<style type='text/css'>  .btn { border-color: "+winButtonProperties.borderColor+" !important;}  </style> <link href='../../../Shared/CoreCSS/scrollbar.css' rel='stylesheet'> <script> App = parent.App; console.log('App',App);</script>"));
-	console.log("hiii: ",$("#main")[0]);
+					console.log("executed",this);
+					$(this).contents().find("head")
+      .prepend($("<style type='text/css'>  .btn { border-color: "+winButtonProperties.borderColor+" !important;}  </style> <link href='../../../Shared/CoreCSS/scrollbar.css' rel='stylesheet'> <script> window.instance = parent.newInstance; console.log('window.instance',window.instance); document.addEventListener('click', function() { console.log('focused iframe'); });</script>"));
+	//console.log("hiii: ",$("#app_tab_1")[0]);
+
+	//console.log("fromae click detection readyA: ",this.contentWindow.document.body);
+	//var frameBody = this.contentWindow.document.body;
+
+	//console.log("fromae click detection ready3: ",$(this.contentWindow.document.body));
+
+	$(this.contentWindow.document.body).click(function() {
+		hideInstanceTabs();
+	});
+
+	//frameBody.onmousedown(function(){ console.log("focused iframe")});
+	//frameBody.click(function(){ /* ... */ });
+	
 
 if (appLocation.indexOf("extern.itai.app") != -1) {
 		executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0");
@@ -1581,8 +2090,9 @@ if (appLocation.indexOf("extern.itai.app") != -1) {
 	}
 
 if (ev.data.appLocation.indexOf("extern.files.app") != -1) {
+				//console.log("elementx: ",document.getElementsByTagName("IFRAME")[0]);
 	win.blur();
-	$("#appContainer").removeClass("hiddenOpacity");
+	$(".appContainer").removeClass("hiddenOpacity");
 	$("#outerBody").addClass("bg_settings");
 	$("#close_button").removeClass("hiddenOpacity");
 	$("#minimize_button").removeClass("hiddenOpacity");
@@ -1642,14 +2152,19 @@ if (ev.data.appLocation.indexOf("extern.files.app") != -1) {
 
 	
 }
-
+console.log("app-ready sent");
 appCommsChannel.postMessage({type: "app-ready"});  //Give some leeway
 	//App.onOpenFiles(empty);
 //});
 });
 
+if (ev.data.appLocation.indexOf("extern.files.app") != -1) {
 
-}, 1000);
+//FIXME: remove this
+}
+
+
+}, 100); //1000
 			}
 
 			
@@ -1692,6 +2207,7 @@ $(".addNews").click(function(){
 	//appCommsChannelTemp.postMessage({type: "requesting-id"});
 console.log("posted");
 
+//document.addEventListener('click', function() { App.checkInstanceFocus(); console.log('focused iframe check'); });
 
 
 
