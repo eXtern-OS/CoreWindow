@@ -43,7 +43,7 @@
 	<!-- Do not change anything (unless you know what you are doing) except the title under id="sub_title" -->
     <body id="body_settings" class="winBorder zeroOpacity hidden">
 <div id="outerBody" style="overflow-y: hidden; overflow-x:hidden; cursor: default;">
-            <div id="hoverDetection" class="hidden"></div>
+            <div id="hoverDetection"></div>
             
             <div id="windowTitleBar" class="bar_bg drag_enabled"> <!--Draggable top bar-->
 				<p id="tile-text" style="font-size: 16px;">
@@ -53,17 +53,28 @@
 				<!--<i id = "close_button" style="font-size: 18px;" class="fa fa-circle-thin" aria-hidden="true"></i>-->
             </div> 
 
-				<a id = "minimize_button" href="#" class="window_buttonsX controlButton hiddenOpacity tooltips"  data-placement="left" data-original-title="Minimize Window"> <!--Minimize Button-->
+            
+
+            
+
+              
+				<a id = "minimize_button" href="#" class="window_buttonsX controlButton hiddenOpacity"  data-placement="left" title="Minimize Window"> <!--Minimize Button-->
 					<i class="fas fa-window-minimize" aria-hidden="true"></i>
 					<!--<span class="icon" style="text-shadow: 0 0 25px rgba(0,0,0,0.9);">&#61701;</span>-->
 				</a>
 
-				<a id = "maximize_button" href="#" class="window_buttonsX controlButton hiddenOpacity tooltips"  data-placement="left" data-original-title="Enlarge Window"> <!--Enlarge Button-->
+				<a id = "maximize_button" href="#" class="window_buttonsX controlButton hiddenOpacity"  data-placement="left" title="Enlarge Window"> <!--Enlarge Button-->
 					<!--<img src="../CoreIMG/icons/actions/maximize.png">  fa-clone #61754;-->
 					<i class="fas fa-square"></i>
 				</a>
 
-<div id = "close_button" class="controlButton hiddenOpacity tooltips"  data-placement="left" data-original-title="Close Window">
+                <a id = "new_tab_instance_button" href="#" onclick="toggleInstanceTabs()" class="window_buttonsX controlButton tooltips btn btn-alt"  data-placement="left" data-original-title="Instance Tabs" style="display: none;"> <!--Minimize Button-->
+					<!--<i class="fas fa-angle-left"></i>-->
+                    <i class="fi-xnllxl-chevron"></i>
+					<!--<span class="icon" style="text-shadow: 0 0 25px rgba(0,0,0,0.9);">&#61701;</span>-->
+                </a>
+
+<div id = "close_button" class="controlButton hiddenOpacity"  data-placement="left" title="Close Window">
     <i class="fas fa-circle"></i>
 </div>
 		<!-- End of restricted editting area-->
@@ -216,14 +227,14 @@
                             <div class="modal-content" style="width: 700px;">
                                 <div class="modal-header" style="text-align: center;">
                                     <button id="closeCustomModal" onclick="handleCloseCustomModal()" style="width: 10px;" type="button" onclick="App.closeCustomModal()" class="close" data-dismiss="modal" aria-hidden="true">
-                                        <i style="font-size: 18px;" class="fa fa-circle-thin" aria-hidden="true"></i>
+                                        <i style="font-size: 18px;" class="fas fa-circle" aria-hidden="true"></i>
                                     </button>
                                     <h4 id="customDialogBoxTitle" class="modal-title" style="font-size: 14px;"><!--Modal title here --></h4>
                                 </div>
                                 <div id="customDialogBoxMessage" class="modal-body" style="font-size: 13px;">
                                    <!-- Modal body here -->
                                 </div>
-                                <div id="customDialogBoxButtons" style="padding: 15px 15px; border-top: 1px solid rgba(255, 255, 255, 0.11);">
+                                <div id="customDialogBoxButtons" style="padding: 15px 15px; border-top: 1px solid rgba(255, 255, 255, 0.11);  min-height: 50px;">
                                     <!-- Modal button options here -->
                                 </div>
                             </div>
@@ -280,8 +291,20 @@
 	</div>
 	<img id="loadingAnimation" class="hidden" src="../CoreIMG/loading.gif">
         
-        <section id="main" style="width: 100%;" class="p-absolute" role="main" >
-            
+        <section id="main" style="width: 100%; height: 100% " class="p-absolute" role="main" >
+            <div class="tab-container tile" style="height: 100%; margin: 0;">
+                        <ul id="tabsBodySelector" class="tab pull-right tab-vertical nav nav-tabs" style="display: none; margin-top: 40px !important;">
+                            <li id="app_tab_elector_0" class="active"><a href="#app_tab_0"><i class="fas fa-object-ungroup pull-left"></i> <span class="pull-left">App</span> </a><i class="fas fa-circle instanceTabCloser" onclick="closeTab(&quot;app_tab_0&quot;)"></i></li>
+                            
+                        </ul>
+                          
+                        <div id="tabsBody" class="tab-content tabsBodyNoTabs" style="height: 100%; padding: 0; width: calc(100% - 23px);">
+                            <div class="tab-pane active overflow" style="height: 100%;" id="app_tab_0">
+                                <!--tab contents -->
+                            </div>
+                            
+                        </div>
+            </div>
           
 				
 				
