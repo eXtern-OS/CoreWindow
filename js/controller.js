@@ -449,6 +449,7 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 		devToolsShow: App.devToolsShow,
 		getAllNews: App.getAllNews,
 		ready: App.ready,
+		removeOpacityProperty: function() { executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -remove _NET_WM_WINDOW_OPACITY"); },
 		updateTitle: function (title) {
 		console.log("titlem: ",this);
 		$("#app_tab_elector_"+this.po+" > a > span").text(title);
@@ -890,6 +891,10 @@ $('#hoverDetection').on("mouseenter", function() {
   }); 
 
 win.on('blur', function() {
+
+console.log("all B: ",window.performance.memory);
+const usedB = window.performance.memory.totalJSHeapSize / 1024 / 1024;
+console.log(`B The instances uses approximately ${Math.round(usedB * 100) / 100} MB`);
 
 if (disableBlurOnLostFocus) {
 	//$("background").removeClass("hidden");
@@ -2129,9 +2134,9 @@ $("#outerBody").addClass("noMargins");
 
 
 		if (ev.data.appLocation.indexOf("extern.photos.app") != -1) {
-			App.removeOpacity = function() {
+			/*AppInstances[AppInstances.length-1].removeOpacity = function() {
 				executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -remove _NET_WM_WINDOW_OPACITY");
-			}
+			}*/
 
 		}
 
