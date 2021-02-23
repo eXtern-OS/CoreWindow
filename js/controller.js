@@ -55,6 +55,15 @@ var finalAppGeometry = {
 	}
 var waitForAppToRespond = false;
 
+document.body.addEventListener('dragover', function(e){
+  e.preventDefault();
+  e.stopPropagation();
+}, false);
+document.body.addEventListener('drop', function(e){
+  e.preventDefault();
+  e.stopPropagation();
+}, false);
+
 /* Supported file extensions */
 var map = {
   'compressed zip': ['zip'],
@@ -81,7 +90,7 @@ var map = {
     'debian': ['deb'],
     'c++ code': ['cc', 'cpp', 'c++','cp','cxx'],
     'python code': ['py','pyc','pyo','pyd'],
-  'image': ['jpg', 'jpge', 'png','PNG'],
+  'image': ['jpg', 'jpeg', 'png','PNG'],
   'pdf': ['pdf'],
   'css': ['css'],
   'java script': ['js'],
@@ -443,6 +452,7 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 		openCustomModal: App.openCustomModal,
 		getModalButtonsDom: function () { return $("#customDialogBoxButtons")[0] },
 		getMountedDrives: App.getMountedDrives,
+		unmountDrive: unmountDrive,
 		updateAudio: App.updateAudio,
 		addCustomWallpaper: App.addCustomWallpaper,
 		packageApp: App.packageApp,
@@ -623,6 +633,31 @@ App.getDefaultLegacyApp = function (file,callback) {
 		getDefaultLegacyApp(mimeType, callback);
 	});
 
+}
+
+function unmountDrive(driveName) {
+	var mountPoint = "/dev/"+driveName;
+	console.log("unmounting...",mountPoint);
+var exec = require('child_process').exec,
+                   child;
+            child = exec("udisksctl unmount -b "+mountPoint,function (error, stdout, stderr)
+    {//process.cwd()+"/blur_app.sh"
+    //console.log('stdout: ' + stdout);
+    //console.log('stderr: ' + stderr);
+    if (error !== null) {
+      console.log('exec error: ' + error);
+    } else {
+        if (stdout.indexOf("failed") == -1) {
+            console.log("successfully unmounted");
+
+	    
+
+            
+        } else
+            console.log("failed to unmount");
+    }
+       
+});
 }
 
 App.getLegacyFileAssociations = function (file,callback) {
