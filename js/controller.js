@@ -1,4 +1,5 @@
 var win = nw.Window.get();
+//win.zoomLevel = 1.25; //FIXME: remoe, testing scailing capabilities
 var internalId;
 var detectedMountedDrives;
 var App = {};
@@ -11,7 +12,7 @@ var initLoaded = false;
 var appLoaded = false;
 var Appready = false;
 var enableDisableBlurOnMaximize = false;
-var disableBlurOnLostFocus = false;
+var disableBlurOnLostFocus = true;
 var delayShowingApp = false;
 var useRealTimeBlur = false;
 var allActiveNews;
@@ -493,9 +494,11 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 		AppInstances[AppInstances.length-1].isReady = function () {
 			if (AppInstances.length > 1)
 				if (files != null) {
+					console.log("here A");
 					//AppInstances[AppInstances.length-1].onOpenFiles(files);
+					setTimeout(function(){ AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
 				} else
-					AppInstances[AppInstances.length-1].showWindowEvent();
+					setTimeout(function(){ console.log("here B"); AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
 		}
 	
 	console.log("set new instance: ",newInstance);
@@ -795,6 +798,9 @@ var currentlyProcessingIDPos = 0;
 var winIdsToProcess = [];
 var keepChecking = false;
 
+
+
+
 function checkIfAnotherWindowExistBehindWIndow() {
 	if ((currentlyProcessingIDPos < winIdsToProcess.length) && keepChecking) {
 		executeNativeCommand('/usr/eXtern/systemX/extern.explorebar/js/windowDimensionsById.sh '+winIdsToProcess[currentlyProcessingIDPos], function(data, err) {
@@ -807,7 +813,7 @@ function checkIfAnotherWindowExistBehindWIndow() {
 				var width = dataSplit[2];
 				var height = dataSplit[3];
 			}
-			if (((x+width) > win.x) && ((win.x+win.width) > x) && ((y+height) > win.y) && ((win.y+win.height) > y)) {
+			if ((((x) > win.x) && (win.x+win.width) > x && ((win.y+win.height) > y && (y+height) > (win.y))) || (y > win.y && (win.y+win.height) > y && ((win.x+win.width) > x && (x+width) > (win.x)))) {
 				App.enableAdaptiveBlur();
 				$("background").fadeOut( 400, function() {
 					App.enableAdaptiveBlur();
@@ -830,8 +836,59 @@ function checkIfAnotherWindowExistBehindWIndow() {
 
 var itatiFirstTriggered = 0;
 
+var gui = require('nw.gui');
+
+gui.Screen.Init();
+
+var screens = gui.Screen.screens;
+
+var currentScreen = screens[0];
+
 function focusBlurCheck() {
-	if (enableDisableBlurOnMaximize || disableBlurOnLostFocus) {
+	let continueChecking = true;
+
+	console.log("checking for edge");
+
+	let canAdjustBgInstantly = true;
+	if ((win.x+win.width) > currentScreen.work_area.width || (win.y+win.height) > currentScreen.work_area.height) {
+		canAdjustBgInstantly = false;
+	}
+
+	if ((win.x+win.width > (currentScreen.work_area.x+currentScreen.work_area.width)) || (win.y+win.height > (currentScreen.work_area.y+currentScreen.work_area.height) || (win.x < currentScreen.work_area.x)  || (win.y < currentScreen.work_area.y))) {
+		if (win.x > currentScreen.work_area.x || win.y > currentScreen.work_area.y) { //on a new monitor adjust blur size
+			for (var i = 0; i < screens.length; i++) {
+				if (win.x < screens[i].work_area.width && win.x > (screens[i].work_area.x-1) && win.y < screens[i].work_area.height && win.x > (screens[i].work_area.y-1)) {
+					currentScreen = screens[i];
+					if (canAdjustBgInstantly)
+						setTimeout(function(){ $("background")[0].style.backgroundSize = `${currentScreen.work_area.width}px ${currentScreen.work_area.height}px`; }, 500);
+					else {
+						$("background")[0].style['background-position'] = "0px 0px";
+						App.enableAdaptiveBlur();
+						$("background").fadeOut( 400, function() {
+							$("background")[0].style.backgroundSize = `${currentScreen.work_area.width}px ${currentScreen.work_area.height}px`;
+						});
+						
+					}
+						
+					break;
+				}
+			}
+		}
+
+		if (canAdjustBgInstantly) {
+			console.log("over edge");
+			
+			App.enableAdaptiveBlur();
+			$("background").fadeOut( 400, function() {
+				App.enableAdaptiveBlur();
+			});
+		}
+		continueChecking = false;
+		
+		keepChecking = false;
+	}
+
+	if ((enableDisableBlurOnMaximize || disableBlurOnLostFocus) && continueChecking) {
 			//App.enableAdaptiveBlur();
 			//$("background").addClass("hidden");
 			//$("background").addClass("hiddenOpacity");
@@ -915,11 +972,27 @@ $('#hoverDetection').on("mouseenter", function() {
     win.on('move', function() {
 		//win.blur();
 		//win.focus();
-    $("background")[0].style['background-position'] = -win.x+"px "+(-win.y)+"px";
+
+		
+		
         
-	console.log("We're moving");
+	
 
 	if (Appready && oldWinX != win.x && oldWinY != win.y) {
+		const xPos = -(win.x-currentScreen.work_area.x);
+		const yPos = -(win.y-currentScreen.work_area.y);
+		let moveBg = true;
+		if (xPos > 0 || yPos > 0) { //Prevent animation when we are gonna hide it anyway and graphically breaks
+			moveBg = false;
+		}
+
+		if (moveBg) {
+			$("background")[0].style['background-position'] = `${xPos}px ${yPos}px`;
+			console.log("We're moving");
+		}
+
+		
+
 		oldWinX = win.x;
 		oldWinY = win.y;
 		console.log("coming here B");
@@ -930,12 +1003,16 @@ $('#hoverDetection').on("mouseenter", function() {
   }); 
 
 win.on('blur', function() {
+	console.log("all B: ",window.performance.memory);
+	const usedB = window.performance.memory.totalJSHeapSize / 1024 / 1024;
+	console.log(`B The instances uses approximately ${Math.round(usedB * 100) / 100} MB`);
+	
+	let canDisableBlur = true;
+	if ((win.x+win.width) > currentScreen.work_area.width || (win.y+win.height) > currentScreen.work_area.height) { //Prevent animation when we are gonna hide it anyway and graphically breaks
+		canDisableBlur = false;
+	}
 
-console.log("all B: ",window.performance.memory);
-const usedB = window.performance.memory.totalJSHeapSize / 1024 / 1024;
-console.log(`B The instances uses approximately ${Math.round(usedB * 100) / 100} MB`);
-
-if (disableBlurOnLostFocus) {
+if (disableBlurOnLostFocus && canDisableBlur) {
 	//$("background").removeClass("hidden");
 	//$("background").removeClass("hiddenOpacity");
 	//App.disableAdaptiveBlur();
@@ -1899,8 +1976,14 @@ setTimeout(function(){
 
 			if (ev.data.type == "open-files") {
 				console.log("open-files: ",ev.data.files);
-				doNotTriggerShowWindowEvents = true;
-				AppInstances[AppInstances.length-1].onOpenFiles(ev.data.files);
+				doNotTriggerShowWindowEvents = false;
+				if (appLocation.indexOf("extern.files.app") != -1) {
+					AppInstances[AppInstances.length-1].argv = ev.data.files;
+					//AppInstances[AppInstances.length-1].onOpenFiles(ev.data.files);
+				} else {
+					AppInstances[AppInstances.length-1].onOpenFiles(ev.data.files);
+				}
+					
 			}
 
 			if (ev.data.type == "minimize-window") {
@@ -1950,8 +2033,12 @@ if (appLocation.indexOf("extern.files.app") != -1) {
 console.log("restoring files app: ",fWidth);
 console.log("restoring files app height: ",fHeight);
 console.log("App.argv: ",App.argv);
-if (!doNotTriggerShowWindowEvents)
-	AppInstances[AppInstances.length-1].showWindowEvent();
+if (!doNotTriggerShowWindowEvents) {
+	console.log("opening from here")
+	setTimeout(function(){ AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
+}
+	
+	
 //win.width = 10;
 //win.height = 10;
 //win.resizeTo(10,10);
