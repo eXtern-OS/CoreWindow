@@ -923,7 +923,7 @@ function focusBlurCheck() {
 var focusTriggeredCounter = 0;
 win.on('focus', function() {
 	if (!Appready) {
-		win.blur();
+		//win.blur();
 	} else {
 		if (focusTriggeredCounter > 0) {
 			console.log("coming here A");
@@ -2316,7 +2316,7 @@ if (appLocation.indexOf("extern.itai.app") != -1) {
 
 if (ev.data.appLocation.indexOf("extern.files.app") != -1) {
 				//console.log("elementx: ",document.getElementsByTagName("IFRAME")[0]);
-	win.blur();
+	//win.blur();
 	$(".appContainer").removeClass("hiddenOpacity");
 	$("#outerBody").addClass("bg_settings");
 	$("#close_button").removeClass("hiddenOpacity");
