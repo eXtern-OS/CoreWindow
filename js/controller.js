@@ -12,11 +12,15 @@ var initLoaded = false;
 var appLoaded = false;
 var Appready = false;
 var enableDisableBlurOnMaximize = false;
-var disableBlurOnLostFocus = true;
+var disableBlurOnLostFocus = false;
 var delayShowingApp = false;
 var useRealTimeBlur = false;
 var allActiveNews;
-win.minimize();
+const usingKwin = false;
+if (usingKwin)
+	win.minimize();
+else
+	win.hide();
 var appLocation = "";
 var maximized = false;
 var _ = require('underscore');
@@ -496,9 +500,10 @@ App.addNewInstanceTab = function (files,autoSwitch,noLoad) {
 				if (files != null) {
 					console.log("here A");
 					//AppInstances[AppInstances.length-1].onOpenFiles(files);
-					setTimeout(function(){ AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
+					AppInstances[AppInstances.length-1].showWindowEvent();
+					//setTimeout(function(){ AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
 				} else
-					setTimeout(function(){ console.log("here B"); AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
+					AppInstances[AppInstances.length-1].showWindowEvent(); //setTimeout(function(){ console.log("here B"); AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
 		}
 	
 	console.log("set new instance: ",newInstance);
@@ -744,6 +749,7 @@ var forceNoBlur = false;
 var forceBlur = false;
 //For Apps like video players to save resources
 App.disableAdaptiveBlur = function(forceState,temporaryForce) {
+	console.log("App.disableAdaptiveBlur CALLED");
 	if (forceState && !temporaryForce)
 		forceNoBlur = true;
 		if (!forceBlur)
@@ -751,6 +757,7 @@ App.disableAdaptiveBlur = function(forceState,temporaryForce) {
 }
 
 App.enableAdaptiveBlur = function(forceState,temporaryForce) {
+	console.log("App.enableAdaptiveBlur CALLED");
 	if (!forceNoBlur || forceState) {
 		forceNoBlur = false;
 
@@ -912,7 +919,14 @@ function focusBlurCheck() {
 				
 				console.log("test hex winIdsToProcess: ",winIdsToProcess);
 				keepChecking = true;
-				checkIfAnotherWindowExistBehindWIndow();
+				if (disableBlurOnLostFocus) {
+					checkIfAnotherWindowExistBehindWIndow(); //Sometimes kinda laggy on startup. Didn't fix this because we aren't using this anymore. Just a heads up as it's not always and you might not notice.
+				} else {
+					App.enableAdaptiveBlur();
+					$("background").fadeOut( 400, function() {
+						//App.enableAdaptiveBlur();
+					});
+				}
 				
 			}
 		});
@@ -927,7 +941,8 @@ win.on('focus', function() {
 	} else {
 		if (focusTriggeredCounter > 0) {
 			console.log("coming here A");
-			focusBlurCheck();
+			if (disableBlurOnLostFocus)
+				focusBlurCheck();
 		} else {
 			focusTriggeredCounter++;
 		}
@@ -996,7 +1011,8 @@ $('#hoverDetection').on("mouseenter", function() {
 		oldWinX = win.x;
 		oldWinY = win.y;
 		console.log("coming here B");
-		focusBlurCheck();
+		if (disableBlurOnLostFocus)
+			focusBlurCheck();
 	}
 			//focusBlurCheck();
 	
@@ -1030,13 +1046,29 @@ if (disableBlurOnLostFocus && canDisableBlur) {
 	if (!Appready) {
 		//executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -remove _NET_WM_WINDOW_OPACITY");
 		
-		win.minimize();
+		if (usingKwin)
+			win.minimize();
+		else
+			win.hide();
 
-		setTimeout(function() { if (!Appready) {win.minimize();} }, 1000); //guarantee we are really minimized as sometimes this is not the case
+		setTimeout(function() { 
+			if (!Appready) { 
+				if (usingKwin)
+					win.minimize();
+				else
+					win.hide();
+			} 
+	}, 1000); //guarantee we are really minimized as sometimes this is not the case
 		
 	if (appLocation.indexOf("extern.files.app") != -1) {
 
-	executeNativeCommand('xprop -f _NET_WM_WINDOW_TYPE 32a -set _NET_WM_WINDOW_TYPE _NET_WM_WINDOW_TYPE_NORMAL -id '+internalId, function () { win.minimize();
+	executeNativeCommand('xprop -f _NET_WM_WINDOW_TYPE 32a -set _NET_WM_WINDOW_TYPE _NET_WM_WINDOW_TYPE_NORMAL -id '+internalId, function () {
+		
+		if (usingKwin)
+			win.minimize();
+		else
+			win.hide();
+
 executeNativeCommand('xprop -f _NET_WM_WINDOW_TYPE 32a -set _NET_WM_WINDOW_TYPE _NET_WM_WINDOW_TYPE_DOCK -id '+internalId); })
 	console.log("moving window to position");
 
@@ -1469,7 +1501,11 @@ executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -re
 console.log("not using scale");
 $("#appPreview").addClass("hidden");
 loadWindowVisuals()
-win.minimize();
+if (usingKwin)
+	win.minimize();
+else
+	win.hide();
+
 	console.log("oldX: ",oldX);
 	console.log("oldY: ",oldY);
 
@@ -1477,7 +1513,10 @@ win.minimize();
 	//App.enableAdaptiveBlur();
 	win.resizeTo(oldWidth,oldHeight);
 	win.moveTo(oldX, oldY);
-win.minimize();
+	if (usingKwin)
+		win.minimize();
+	else
+		win.hide();
 
 if (appLocation.indexOf("extern.itai.app") != -1) {
 	$("#close_button").removeClass("hiddenOpacity");
@@ -1486,7 +1525,10 @@ if (appLocation.indexOf("extern.itai.app") != -1) {
 	$("#outerBody").addClass("bg_settings");
 	appCommsChannel.postMessage({type: "app-opened"});
 	enableDisableBlurOnMaximize = true;
-	win.restore(); 
+	if (usingKwin)
+		win.restore(); 
+	else
+		win.show();
 	setTimeout(function(){ executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -remove _NET_WM_WINDOW_OPACITY");}, 2000);
 } else
 setTimeout(function(){ 
@@ -1501,7 +1543,10 @@ executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -re
 	$("#maximize_button").removeClass("hiddenOpacity");
 	$("#outerBody").addClass("bg_settings");
 
-	win.restore(); 
+	if (usingKwin)
+		win.restore(); 
+	else
+		win.show();
 
 	appCommsChannel.postMessage({type: "app-opened"});
 	setTimeout(function(){  win.setAlwaysOnTop(false); }, 1000);
@@ -1898,15 +1943,16 @@ appCommsChannel.onmessage = function (ev) {
 		//height: '+wallpaperheight+'px; width: '+wallpaperWidth+'px;
       if ($( window.document.body.children[0])[0].nodeName !="BACKGROUND")
 		if (globalDefaultBgPosition != "") {
-		          $(window.document.body).prepend('<background class="noMargins" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat; background-position: '+globalDefaultBgPosition+'; background-size: '+globalDefaultBgSize+';" class="'+hideBackgroundClass+'"></background>');
+		          $(window.document.body).prepend(`<background class="noMargins ${disableBlurOnLostFocus ? '' : 'hidden'}" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat; background-position: '+globalDefaultBgPosition+'; background-size: '+globalDefaultBgSize+';" class="'+hideBackgroundClass+'"></background>`);
 	document.body.children[0].style.backgroundImage = ev.data.data;
 //ev.data.data
 		//$(new_win.outerBodyBackground[0]).css("background-position",new_win.oldbackgroundPosition);
 		console.log("set with.. ",globalDefaultBgPosition);
 	} else {
-		$(window.document.body).prepend('<background class="noMargins" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat;" class="'+hideBackgroundClass+'"></background>');
+		$(window.document.body).prepend(`<background class="noMargins ${disableBlurOnLostFocus ? '' : 'hidden'}" style="border-radius: 5px 5px 5px; position: absolute; height: calc(100% - 50px); width: calc(100% - 50px); box-shadow: rgba(0, 0, 0, 1) 0px 0px 30px; top: 25px; left: 25px; background-repeat: repeat;" class="'+hideBackgroundClass+'"></background>`);
 
-	document.body.children[0].style.backgroundImage = ev.data.data;
+		if (disableBlurOnLostFocus)
+			document.body.children[0].style.backgroundImage = ev.data.data;
 	}
 
       //console.log('New window BG ELEMENT',$( new_win.window.document.body.children[0])[0].nodeName);
@@ -2002,6 +2048,14 @@ setTimeout(function(){
 			if (ev.data.type == "decrease-volume") {
 				AppInstances[AppInstances.length-1].decreaseVolume();
 			}
+
+			if (ev.data.type == "increase-brightness") {
+				AppInstances[AppInstances.length-1].increaseBrightness();
+			}
+			
+			if (ev.data.type == "decrease-brightness") {
+				AppInstances[AppInstances.length-1].decreaseBrightness();
+			}
 			
 			if (ev.data.type == "set-brightness") {
 				AppInstances[AppInstances.length-1].setBrightnes(ev.data.level);
@@ -2035,7 +2089,8 @@ console.log("restoring files app height: ",fHeight);
 console.log("App.argv: ",App.argv);
 if (!doNotTriggerShowWindowEvents) {
 	console.log("opening from here")
-	setTimeout(function(){ AppInstances[AppInstances.length-1].showWindowEvent(); }, 2000);
+	AppInstances[AppInstances.length-1].showWindowEvent();
+	//setTimeout(function(){ AppInstances[AppInstances.length-1].showWindowEvent(); }, 1000);
 }
 	
 	
@@ -2082,7 +2137,10 @@ executeNativeCommand("xprop -id "+internalId+" -f _NET_WM_WINDOW_OPACITY 32c -re
 
 
 Appready = true;
-win.restore(); 
+if (usingKwin)
+	win.restore();
+else
+	win.show();
 //win.showDevTools();
 
 });
@@ -2184,7 +2242,13 @@ win.restore();
 			console.log("end");
 		var useLegacyAnimation = false;
 		if (useLegacyAnimation) {
-setTimeout(function() { win.restore(); }, 500);
+setTimeout(function() { 
+	if (usingKwin)
+		win.restore();
+	else
+		win.show();
+
+}, 500);
 }
 
 	/*setTimeout(function() {
@@ -2214,12 +2278,21 @@ if (App.argv != null) {
 		//Screenshot lets do something
 		ignorePhotosInactive = true;
 		console.log("it's a screenshot");
-		win.restore();
+		if (usingKwin)
+			win.restore();
+		else
+			win.show();
 	} else {
-		win.minimize();
+		if (usingKwin)
+			win.minimize();
+		else
+			win.hide();
 	}
 } else {
-	win.minimize();
+	if (usingKwin)
+		win.minimize();
+	else
+		win.hide();
 }
 	console.log("lets go");
 //executeNativeCommand("wmctrl -i -R "+internalId, function() {
@@ -2365,7 +2438,10 @@ if (ev.data.appLocation.indexOf("extern.files.app") != -1) {
 		win.resizeTo(width,height);
 		win.moveTo(mx,my);
 		//loadWindowVisuals();
-		win.minimize();
+		if (usingKwin)
+			win.minimize();
+		else
+			win.hide();
 		executeNativeCommand('xprop -f _NET_WM_WINDOW_TYPE 32a -set _NET_WM_WINDOW_TYPE _NET_WM_WINDOW_TYPE_DOCK -id '+internalId);
 		//setTimeout(function() {  }, 1000);
 	});
